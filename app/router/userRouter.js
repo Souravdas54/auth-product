@@ -7,9 +7,9 @@ const AuthCheckToken = require('../middleware/authMiddleware')
 
 
 router.post('/register/user', Userdata.register);
-router.post('/signin', AuthCheckToken, Userdata.signin)
+router.post('/signin',  Userdata.signin)
 
-router.post('/create', upload.single('image'), Productdata.crestedata);
+router.post('/create',AuthCheckToken, upload.single('image'), Productdata.crestedata);
 
 
 module.exports = router;
