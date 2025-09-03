@@ -26,7 +26,7 @@ class AuthController {
             if (sameEmail) {
                 return res.status(statusCode.BAD_REQUEST).json({ message: "Email already exists" })
             }
-           
+
 
             const newImagepath = req?.file ? req?.file?.path?.replace(/\\/g, '/') : null;
 
@@ -46,7 +46,7 @@ class AuthController {
 
             const newdata = await registerdata.save();
 
-            // res.redirect('/auth/signin/user')
+            res.redirect('/auth/signin/user')
 
             return res.status(201).json({
                 success: true,
@@ -67,11 +67,14 @@ class AuthController {
         console.log("LOGIN", req.body);
 
         try {
-            const { email, password, } = req.body;
+            const { email, password, rememberme } = req.body;
 
             if (!email || !password) {
-                return res.status(statusCode.BAD_REQUEST).json({
-                    message: "Email and password are required",
+                return res.status(statusCode.BAD_REQUEST).render("login", {
+                    title: "Sign In",
+                    email,
+                    rememberme,
+                    error: "Email and password are required"
                 });
             }
 
@@ -79,22 +82,50 @@ class AuthController {
             const validemail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/; // Email validation 
 
             if (!validemail.test(email)) {
-                return res.status(statusCode.BAD_REQUEST).json({ message: "Please enter a valid email address" })
+                return res.status(statusCode.BAD_REQUEST).render("login", {
+                title: "Sign In",
+                email,
+                rememberme,
+                error: "Please enter a valid email address"
+                    
+                    })
 
             }
             if (!user) {
-                return res.status(statusCode.BAD_REQUEST).json({
-                    message: "User not found with this email address.",
+                return res.status(statusCode.BAD_REQUEST).render("login", {
+                title: "Sign In",
+                email,
+                rememberme,
+                error: "Please enter a valid email address"
                 });
             }
 
 
             const matchPass = await bcrypt.compare(password, user.password);
             if (!matchPass) {
-                return res.status(statusCode.BAD_REQUEST).json({
-                    message: "Password incorrect",
+                return res.status(statusCode.BAD_REQUEST).render("login", {
+                title: "Sign In",
+                email,
+                rememberme,
+                error: "Please enter a valid email address"
                 });
             }
+
+            if (rememberme) {
+                res.cookie('email', email,
+                    { maxAge: 30 * 60 * 1000 })
+
+                // res.cookie('password', password,
+                //     { maxAge: 30 * 60 * 1000 })
+
+                res.cookie('rememberme', true,
+                    { maxAge: 30 * 60 * 1000 })
+            } else {
+                res.clearCookie('email')
+                // res.clearCookie('password')
+                res.clearCookie('rememberme')
+            }
+
 
 
             const token = jwt.sign(
@@ -110,13 +141,24 @@ class AuthController {
                 process.env.JWT_SECRET_KEY,
                 { expiresIn: "30m" }
             );
-            res.cookie('token', token, {
-                httpOnly: true,
-                // secure: false, // production hole true
-                maxAge: 30 * 60 * 1000 // 30 min
-            })
 
-            // res.redirect('/auth/dashoard/user') // Redirect Dashboard page
+            if (token) {
+                res.cookie('token', token, {
+                    httpOnly: true,
+                    // secure: false, // production hole true
+                    maxAge: 30 * 60 * 1000 // 30 min
+                })
+                res.redirect('/auth/dashoard/user') // Redirect Dashboard page 
+            }
+            //  else {
+            //     res.redirect('/signin/user')
+            // }
+
+            // if(rememberme){
+            //     req.session.cookie.maxAge =  30 * 60 * 1000 ;
+            // }else{
+            //     req.session.cookie.expires = false;
+            // }
 
             return res.status(200).json({
                 message: "Login successful",
@@ -135,6 +177,7 @@ class AuthController {
         }
     }
 
+
     async profile(req, res) {
 
         try {
@@ -149,6 +192,11 @@ class AuthController {
         } catch (error) {
 
         }
+    }
+
+    async logout(req, res) {
+        res.clearCookie('token')
+        return res.redirect('/auth/signin/user')
     }
 }
 

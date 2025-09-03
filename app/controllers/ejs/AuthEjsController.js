@@ -2,9 +2,15 @@
 
 class AuthEjsController {
     async viewregister(req, res) {
-        res.render('register', {
-            title: "Sign Up"
-        })
+        try {
+            res.render('register', {
+                title: "Sign Up",
+                email: req.cookies.email || "",
+                rememberme: req.cookies.rememberme === "true"
+            })
+        } catch (error) {
+            console.error("Render Login Error:", error);
+        }
     }
 
     async viewsignin(req, res) {
@@ -13,6 +19,11 @@ class AuthEjsController {
         })
     }
 
+    async dashboard(req, res) {
+        res.render('dashboard', {
+            title: "Dashboard"
+        })
+    }
 }
 
 module.exports = new AuthEjsController()
