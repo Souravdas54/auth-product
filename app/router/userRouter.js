@@ -9,8 +9,4 @@ const Userdata = require('../controllers/authController');
 
 router.post('/register/user', upload.single('image'),Userdata.register);
 
-
-router.post('/signin/user', Userdata.signin)
-
-
 module.exports = router;
