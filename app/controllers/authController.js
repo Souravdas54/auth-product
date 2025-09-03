@@ -1,29 +1,59 @@
 const hashPassword = require("../helper/hashPassword");
-const User = require("../model/authModule");
-
 const jwt = require('jsonwebtoken');
+const User = require("../model/authModule");
+const bcrypt = require('bcryptjs')
+const statusCode = require("../helper/status");
+
 
 class AuthController {
+
     async register(req, res) {
         console.log("Request Body:", req.body);
-
         try {
-            const { name, email, phone, city, password } = req.body;
+            const { name, email, phone, city, gender, password } = req.body;
 
-            if (!name || !email || !phone || !city || !password) {
-                return res.status(400).json({ message: "All fields are required" });
+            if (!name || !email || !phone || !city || !password) { // Check all fields
+                return res.status(statusCode.BAD_REQUEST).json({ message: "All fields are required" });
             }
 
-            const hashingpassword = await hashPassword(password)
+            const sameEmail = await User.findOne({ email }) // Get Same Email ID
+            const validemail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/ // Email validation 
 
-            const registerdata = new User({ name, email, phone, city, password:hashingpassword },{new:true});
+            if (!validemail.test(email)) {
+                return res.status(statusCode.BAD_REQUEST).json({ message: "Please enter a valid email address" })
+
+            }
+            if (sameEmail) {
+                return res.status(statusCode.BAD_REQUEST).json({ message: "Email already exists" })
+            }
+           
+
+            const newImagepath = req?.file ? req?.file?.path?.replace(/\\/g, '/') : null;
+
+            // const validPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+
+            if (password.length < 6) {
+                return res.status(statusCode.BAD_REQUEST).json({
+                    // message: "Password must be at least 8 characters long, include 1 uppercase, 1 lowercase, 1 number, and 1 special character."
+                    message: "Password must be at least 6 characters long."
+                });
+            }
+            const hashingpassword = await hashPassword(password) // Hash Password
+
+            const registerdata = new User({ name, email, phone, gender, city, image: newImagepath, password: hashingpassword });
+
+
             const newdata = await registerdata.save();
+
+            // res.redirect('/auth/signin/user')
 
             return res.status(201).json({
                 success: true,
                 message: "Registration successful",
                 data: newdata
             });
+
         } catch (error) {
             console.error("Registration Error:", error);
             return res.status(500).json({
@@ -34,28 +64,38 @@ class AuthController {
     }
 
     async signin(req, res) {
+        console.log("LOGIN", req.body);
+
         try {
-            const { email, password } = req.body;
+            const { email, password, } = req.body;
 
             if (!email || !password) {
-                return res.status(400).json({
+                return res.status(statusCode.BAD_REQUEST).json({
                     message: "Email and password are required",
                 });
             }
 
-            const user = await User.findOne({ email }); 
+            const user = await User.findOne({ email });
+            const validemail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/; // Email validation 
+
+            if (!validemail.test(email)) {
+                return res.status(statusCode.BAD_REQUEST).json({ message: "Please enter a valid email address" })
+
+            }
             if (!user) {
-                return res.status(400).json({
-                    message: "Email not found",
+                return res.status(statusCode.BAD_REQUEST).json({
+                    message: "User not found with this email address.",
                 });
             }
 
-            const matchPass = await bcrypt.compare(password, user.password); 
+
+            const matchPass = await bcrypt.compare(password, user.password);
             if (!matchPass) {
-                return res.status(400).json({
+                return res.status(statusCode.BAD_REQUEST).json({
                     message: "Password incorrect",
                 });
             }
+
 
             const token = jwt.sign(
                 {
@@ -63,19 +103,28 @@ class AuthController {
                     name: user.name,
                     email: user.email,
                     phone: user.phone,
+                    gender: user.gender,
                     city: user.city,
+                    image: user.image,
                 },
                 process.env.JWT_SECRET_KEY,
                 { expiresIn: "30m" }
             );
+            res.cookie('token', token, {
+                httpOnly: true,
+                // secure: false, // production hole true
+                maxAge: 30 * 60 * 1000 // 30 min
+            })
+
+            // res.redirect('/auth/dashoard/user') // Redirect Dashboard page
 
             return res.status(200).json({
                 message: "Login successful",
+                token: token,
                 user: {
                     name: user.name,
                     email: user.email,
                 },
-                token: token,
             });
         } catch (error) {
             console.error("Signin Error:", error);
@@ -83,6 +132,22 @@ class AuthController {
                 message: "Internal server error",
                 error: error.message,
             });
+        }
+    }
+
+    async profile(req, res) {
+
+        try {
+            const user = await User.findById(req.user.id).select('-password')
+
+            if (!user) {
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            res.render('dashboard', { title: 'Dashboard', user })
+
+        } catch (error) {
+
         }
     }
 }
